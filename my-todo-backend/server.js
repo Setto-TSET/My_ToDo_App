@@ -5,6 +5,7 @@ const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 const app = express();
 app.use(cors());
@@ -17,7 +18,52 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME,
   dateStrings: true, 
 });
+const initializeDB = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS categories (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        user_id INT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS tasks (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        status VARCHAR(50) DEFAULT 'Pending',
+        due_date DATE,
+        category_id INT,
+        owner_id INT,
+        FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
+        FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS task_assignees (
+        task_id INT,
+        user_id INT,
+        PRIMARY KEY (task_id, user_id),
+        FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+    console.log("ตรวจสอบและสร้างตารางใน Database สำเร็จ!");
+  } catch (error) {
+    console.error("เกิดข้อผิดพลาดในการสร้างตาราง:", error.message);
+  }
+};
 
+initializeDB(); 
 const SECRET_KEY = process.env.JWT_SECRET;
 
 
@@ -67,7 +113,7 @@ app.post('/api/forgot-password', async (req, res) => {
         from: `"Admin" <${process.env.EMAIL_USER}>`,
         to: email,
         subject: 'Reset Password',
-        html: `<p>คลิกเพื่อตั้งรหัสใหม่: <a href="http://localhost:5173/reset-password?email=${email}">Reset Password</a></p>`
+        html: `<p>คลิกเพื่อตั้งรหัสใหม่: <a href="${frontendUrl}/reset-password?email=${email}">Reset Password</a></p>`
       };
       await transporter.sendMail(mailOptions);
     }
@@ -89,6 +135,7 @@ app.get('/api/tasks', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     const query = `
       SELECT t.*, c.name as category, u_owner.username as ownerName,
+      DATE_FORMAT(t.due_date, '%Y-%m-%d') as due_date,
       GROUP_CONCAT(DISTINCT u_assignee.username) as assignees_string
       FROM tasks t
       LEFT JOIN categories c ON t.category_id = c.id
