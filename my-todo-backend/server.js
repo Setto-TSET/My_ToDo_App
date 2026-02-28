@@ -17,7 +17,7 @@ const pool = mysql.createPool({
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
   dateStrings: true, 
-  port: process.env.PORT || 5000
+  port: process.env.DB_PORT || 3306 
 });
 const initializeDB = async () => {
   try {
