@@ -131,7 +131,7 @@ app.post('/api/forgot-password', async (req, res) => {
       const htmlContent = `<div style="font-family: sans-serif; text-align: center; padding: 20px;">
                  <h2>คำขอเปลี่ยนรหัสผ่าน</h2>
                  <p>คุณได้รับคำขอเปลี่ยนรหัสผ่าน คลิกที่ปุ่มด้านล่างเพื่อตั้งรหัสใหม่:</p>
-                 <a href="${frontendUrl}/?email=${email}" style="display: inline-block; padding: 10px 20px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 10px;">ตั้งรหัสผ่านใหม่</a>
+                 <a href="${frontendUrl}/reset-password?email=${email}" style="display: inline-block; padding: 10px 20px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 10px;">ตั้งรหัสผ่านใหม่</a>
                </div>`;
 
       await sendMailViaAPI(email, 'Reset Password - My ToDo App', htmlContent);
