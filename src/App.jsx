@@ -286,12 +286,18 @@ export default function App() {
                     {task.dueDate || '-'}
                   </td>
                   <td className="px-8 py-5">
-                    <div className="flex -space-x-2 overflow-hidden">
-                      {task.assignees?.map((name, i) => (
-                        <div key={i} title={name} className="w-8 h-8 rounded-full bg-blue-600 border-2 border-white flex items-center justify-center text-[10px] text-white font-bold shadow-sm">{name.charAt(0).toUpperCase()}</div>
-                      ))}
-                    </div>
-                  </td>
+               <div className="flex flex-col gap-1">
+                  <div className="flex -space-x-2">
+                     {task.assignees?.map((name, i) => (
+                  <div key={i} title={name} className="w-8 h-8 rounded-full bg-blue-600 border-2 border-white flex items-center justify-center text-[10px] text-white font-bold shadow-sm">{name.charAt(0).toUpperCase()}</div>
+                  ))}
+              </div>
+              {/* เพิ่มส่วนนี้เพื่อแสดงชื่อเป็นตัวอักษร */}
+              <span className="text-[10px] text-gray-400">
+                {task.assignees?.join(', ')}
+              </span>
+                </div>
+              </td>
                   <td className="px-8 py-5 text-right">
                     <button onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }} className="text-gray-300 hover:text-red-500 transition"><Trash2 size={18}/></button>
                   </td>
