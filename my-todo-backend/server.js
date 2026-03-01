@@ -14,7 +14,7 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
-
+//test
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
