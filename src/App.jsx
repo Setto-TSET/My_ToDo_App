@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, Clock, List, Plus, Search, Tag, X, Trash2, LogOut, User, Lock, Mail, Filter } from 'lucide-react';
+const API_URL = import.meta.env.VITE_API_URL || 'https://mytodoapp-production-db0e.up.railway.app';
 
 export default function App() {
 
@@ -34,7 +35,7 @@ export default function App() {
 
   const fetchTasks = async () => {
     try {
-      const response = await fetch('http://mytodoapp-production-db0e.up.railway.app/api/tasks', {
+      const response = await fetch(`${API_URL}/api/tasks`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -48,7 +49,7 @@ export default function App() {
     e.preventDefault();
     const endpoint = isRegistering ? '/api/register' : '/api/login';
     try {
-      const res = await fetch(`http://mytodoapp-production-db0e.up.railway.app${endpoint}`, {
+      const res = await fetch(`${API_URL}${endpoint}`, { // ✨ แก้เป็น https
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(authForm)
@@ -78,7 +79,7 @@ export default function App() {
   const handleClearCompleted = async () => {
     if (!window.confirm("คุณต้องการลบงานที่ทำสำเร็จแล้วทั้งหมดใช่หรือไม่?")) return;
     try {
-      const res = await fetch('http://mytodoapp-production-db0e.up.railway.app/api/tasks/completed', {
+      const res = await fetch(`${API_URL}/api/tasks/completed`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -92,7 +93,7 @@ export default function App() {
   const handleDeleteTask = async (id) => {
     if (!window.confirm("คุณต้องการลบงานนี้ใช่หรือไม่?")) return;
     try {
-      const res = await fetch(`http://mytodoapp-production-db0e.up.railway.app/api/tasks/${id}`, {
+      const res = await fetch(`${API_URL}/api/tasks/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -108,7 +109,7 @@ export default function App() {
     setSelectedTask(updatedTask);
     setTasks(tasks.map(t => t.id === selectedTask.id ? updatedTask : t));
     try {
-      await fetch(`http://mytodoapp-production-db0e.up.railway.app/api/tasks/${selectedTask.id}`, {
+      await fetch(`${API_URL}/api/tasks/${selectedTask.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(updatedTask)
@@ -134,7 +135,7 @@ export default function App() {
             </div>
             <form onSubmit={async (e) => {
               e.preventDefault();
-              const res = await fetch('http://mytodoapp-production-db0e.up.railway.app/api/reset-password', {
+              const res = await fetch(`${API_URL}/api/reset-password`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: resetData.email, newPassword: resetData.newPassword })
@@ -162,7 +163,7 @@ export default function App() {
             <p className="text-gray-500 text-center mb-6 text-sm">เราจะส่งลิงก์กู้คืนรหัสผ่านไปให้ทางอีเมลครับ</p>
             <form onSubmit={async (e) => {
               e.preventDefault();
-              const res = await fetch('http://mytodoapp-production-db0e.up.railway.app/api/forgot-password', {
+              const res = await fetch(`${API_URL}/api/forgot-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: resetEmail })
@@ -293,7 +294,7 @@ export default function App() {
             <form onSubmit={async (e) => {
               e.preventDefault();
               try {
-                const res = await fetch('http://mytodoapp-production-db0e.up.railway.app/api/tasks', {
+                const res = await fetch(`${API_URL}/api/tasks`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                   body: JSON.stringify(newTask)

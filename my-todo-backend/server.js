@@ -9,7 +9,7 @@ const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 const app = express();
 app.use(cors({
-  origin: 'https://my-todo-app-ochre.vercel.app',
+  origin: ['https://my-todo-app-ochre.vercel.app', 'http://localhost:5173'],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 }));
