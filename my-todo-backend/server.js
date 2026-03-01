@@ -122,35 +122,66 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.post('/api/forgot-password', async (req, res) => {
-  console.log("📨 คำขอรีเซ็ตรหัสผ่าน (HTTPS API):", req.body.email);
   try {
     const { email } = req.body;
     const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-    
+
     if (users.length > 0) {
-      const htmlContent = `<div style="font-family: sans-serif; text-align: center; padding: 20px;">
-         <h2>คำขอเปลี่ยนรหัสผ่าน</h2>
-         <p>คุณได้รับคำขอเปลี่ยนรหัสผ่าน คลิกที่ปุ่มด้านล่างเพื่อตั้งรหัสใหม่:</p>
-         <a href="${frontendUrl}/?email=${email}" style="display: inline-block; padding: 10px 20px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 10px;">ตั้งรหัสผ่านใหม่</a>
-       </div>`;
+      const resetToken = jwt.sign(
+        { email },
+        SECRET_KEY,
+        { expiresIn: "15m" }
+      );
+
+      const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
+
+      const htmlContent = `
+        <div style="font-family: sans-serif; text-align: center; padding: 20px;">
+          <h2>คำขอเปลี่ยนรหัสผ่าน</h2>
+          <p>คลิกปุ่มด้านล่างเพื่อตั้งรหัสผ่านใหม่ (ลิงก์หมดอายุใน 15 นาที)</p>
+          <a href="${resetLink}"
+             style="display:inline-block;padding:10px 20px;background:#2563eb;color:white;text-decoration:none;border-radius:8px;font-weight:bold;">
+             ตั้งรหัสผ่านใหม่
+          </a>
+        </div>
+      `;
 
       await sendMailViaAPI(email, 'Reset Password - My ToDo App', htmlContent);
-      console.log("🚀 ส่งเมลสำเร็จผ่าน Gmail HTTPS API แบบไม่ผ่าน SMTP!");
     }
+
     res.json({ message: "หากมีอีเมลนี้ในระบบ เราได้ส่งลิงก์ไปให้แล้วครับ" });
-  } catch (error) { 
-    console.error("❌ Email API Error:", error.message);
-    res.status(500).json({ error: "ส่งเมลไม่สำเร็จ: " + error.message }); 
+  } catch (error) {
+    res.status(500).json({ error: "เกิดข้อผิดพลาด" });
   }
 });
 
 app.put('/api/reset-password', async (req, res) => {
   try {
-    const { email, newPassword } = req.body;
+    const { token, newPassword } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: "Missing token" });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, SECRET_KEY);
+    } catch (err) {
+      return res.status(400).json({ error: "Token ไม่ถูกต้องหรือหมดอายุ" });
+    }
+
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await pool.query('UPDATE users SET password_hash = ? WHERE email = ?', [hashedPassword, email]);
+
+    await pool.query(
+      'UPDATE users SET password_hash = ? WHERE email = ?',
+      [hashedPassword, decoded.email]
+    );
+
     res.json({ message: "เปลี่ยนรหัสผ่านสำเร็จ" });
-  } catch (error) { res.status(500).json({ error: "เกิดข้อผิดพลาด" }); }
+
+  } catch (error) {
+    res.status(500).json({ error: "เกิดข้อผิดพลาด" });
+  }
 });
 
 // --- Task APIs ---
