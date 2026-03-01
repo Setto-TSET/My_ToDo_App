@@ -97,8 +97,18 @@ const authenticateToken = (req, res, next) => {
 };
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false,
+  pool: true,    
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  },
+  tls: {
+    rejectUnauthorized: false,
+    minVersion: 'TLSv1.2'
+  }
 });
 
 app.post('/api/register', async (req, res) => {
@@ -123,20 +133,30 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.post('/api/forgot-password', async (req, res) => {
+  console.log("📨 กำลังตรวจสอบอีเมล:", req.body.email);
   try {
     const { email } = req.body;
     const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+    
     if (users.length > 0) {
+      console.log("พบผู้ใช้ในระบบ กำลังพยายามส่งเมล...");
       const mailOptions = {
         from: `"Admin" <${process.env.EMAIL_USER}>`,
         to: email,
         subject: 'Reset Password',
-        html: `<p>คลิกเพื่อตั้งรหัสใหม่: <a href="${frontendUrl}/reset-password?email=${email}">Reset Password</a></p>`
+        html: `<p>คลิกเพื่อตั้งรหัสใหม่: <a href="${process.env.FRONTEND_URL}/reset-password?email=${email}">Reset Password</a></p>`
       };
-      await transporter.sendMail(mailOptions);
+      
+      const info = await transporter.sendMail(mailOptions);
+      console.log("ส่งเมลสำเร็จ! ID:", info.messageId);
+    } else {
+      console.log("ไม่พบอีเมลนี้ในระบบ");
     }
     res.json({ message: "หากมีอีเมลนี้ในระบบ เราได้ส่งลิงก์ไปให้แล้วครับ" });
-  } catch (error) { res.status(500).json({ error: "ส่งเมลไม่สำเร็จ: " + error.message }); }
+  } catch (error) { 
+    console.error("เกิดข้อผิดพลาดการส่งเมล:", error.message);
+    res.status(500).json({ error: "ส่งเมลไม่สำเร็จ: " + error.message }); 
+  }
 });
 
 app.put('/api/reset-password', async (req, res) => {
