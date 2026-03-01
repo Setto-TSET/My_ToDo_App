@@ -1,5 +1,6 @@
 const dns = require('dns');
-dns.setDefaultResultOrder('ipv4first'); // ✨ บังคับ IPv4 ป้องกัน Error ระดับ Network
+// ✨ บังคับ IPv4 ตั้งแต่ระดับ Node.js ป้องกัน Error ENETUNREACH
+dns.setDefaultResultOrder('ipv4first'); 
 
 require('dotenv').config(); 
 const express = require('express');
@@ -7,7 +8,7 @@ const cors = require('cors');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
+const nodemailer = require('nodemailer'); 
 
 const app = express();
 const frontendUrl = process.env.FRONTEND_URL || 'https://my-todo-app-ochre.vercel.app';
@@ -15,7 +16,11 @@ const frontendUrl = process.env.FRONTEND_URL || 'https://my-todo-app-ochre.verce
 // --- CORS Configuration ---
 app.use(cors({
   origin: function (origin, callback) {
-    const allowedOrigins = ['https://my-todo-app-ochre.vercel.app', 'http://localhost:5173', 'http://localhost:3000'];
+    const allowedOrigins = [
+      'https://my-todo-app-ochre.vercel.app', 
+      'http://localhost:5173', 
+      'http://localhost:3000'
+    ];
     if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
       callback(null, true);
     } else {
@@ -53,7 +58,10 @@ initializeDB();
 
 // --- ✨ Gmail API (OAuth2) Configuration ---
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  // ✨ ลบ service: 'gmail' ออก และใช้ host/port ตรงๆ เพื่อไม่ให้มันไปทับค่าบังคับ IPv4
+  host: 'smtp.gmail.com', 
+  port: 465,              
+  secure: true,           
   auth: {
     type: 'OAuth2',
     user: process.env.EMAIL_USER,
@@ -61,7 +69,7 @@ const transporter = nodemailer.createTransport({
     clientSecret: process.env.GMAIL_CLIENT_SECRET,
     refreshToken: process.env.GMAIL_REFRESH_TOKEN
   },
-  family: 4, // ✨ เติมให้แล้ว! บังคับ IPv4 เพื่อแก้ปัญหา ENETUNREACH
+  family: 4, // ✨ บังคับใช้ IPv4 เท่านั้น (ทะลวง Firewall ของ Railway)
   tls: {
     rejectUnauthorized: false
   }
@@ -110,7 +118,7 @@ app.post('/api/login', async (req, res) => {
   } catch (error) { res.status(500).json({ error: "ระบบขัดข้อง" }); }
 });
 
-// ✨ รวม Route Forgot Password ให้เหลืออันเดียวที่สมบูรณ์ที่สุด
+// ✨ Route Forgot Password (มีอันเดียว ไม่ซ้ำซ้อนแล้ว)
 app.post('/api/forgot-password', async (req, res) => {
   console.log("📨 คำขอรีเซ็ตรหัสผ่าน (OAuth2):", req.body.email);
   try {
@@ -151,9 +159,10 @@ app.put('/api/reset-password', async (req, res) => {
 // --- Task APIs ---
 app.get('/api/tasks', authenticateToken, async (req, res) => {
   try {
+    // ✨ ลบการเรียก ownerName ซ้ำซ้อนออกแล้ว
     const query = `
       SELECT t.*, c.name as category, 
-      u_owner.username as ownerName, -- ✨ ลบส่วนที่พิมพ์ซ้ำออกแล้ว
+      u_owner.username as ownerName, 
       DATE_FORMAT(t.due_date, '%Y-%m-%d') as due_date,
       GROUP_CONCAT(DISTINCT u_assignee.username) as assignees_string
       FROM tasks t
@@ -232,5 +241,5 @@ app.delete('/api/tasks/:id', authenticateToken, async (req, res) => {
 
 const PORT = process.env.PORT || 8080; 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
