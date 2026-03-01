@@ -2,15 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, X, Trash2, LogOut, Lock, Mail, Calendar, UserCircle } from 'lucide-react';
 
-import ResetPassword from "./ResetPassword";
-
-<BrowserRouter>
-  <Routes>
-    <Route path="/" element={<Home />} />
-    <Route path="/reset-password" element={<ResetPassword />} />
-  </Routes>
-</BrowserRouter>
-
 const API_URL = 'https://mytodoapp-production-db0e.up.railway.app';
 
 export default function App() {
