@@ -56,6 +56,7 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASS // รหัส App Password 16 หลัก
   },
   tls: { rejectUnauthorized: false }
+  family: 4
 });
 
 // ตรวจสอบความพร้อมของระบบ SMTP ตอนเริ่มระบบ
