@@ -1,4 +1,4 @@
-// Force fresh build - UI Version 2.0
+// Force fresh build - UI Version 2.0 (Fixed Reset Password Payload)
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, X, Trash2, LogOut, Lock, Mail, Calendar, UserCircle } from 'lucide-react';
 
@@ -11,8 +11,11 @@ export default function App() {
   const [authForm, setAuthForm] = useState({ username: '', email: '', password: '' });
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
+  
+  // สถานะสำหรับหน้าตั้งรหัสผ่านใหม่
   const [isResetPage, setIsResetPage] = useState(false);
-  const [resetData, setResetData] = useState({ email: '', newPassword: '' });
+  const [resetToken, setResetToken] = useState(''); // เก็บ Token จาก URL
+  const [resetData, setResetData] = useState({ newPassword: '' });
 
   const [tasks, setTasks] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -25,12 +28,15 @@ export default function App() {
   const [selectedTask, setSelectedTask] = useState(null);
 
   useEffect(() => {
+    // ดึงค่า token จาก URL (เช่น ?token=eyJhbG...)
     const params = new URLSearchParams(window.location.search);
-    const emailParam = params.get('email');
-    if (window.location.pathname.includes('reset-password') || emailParam) {
+    const urlToken = params.get('token');
+    
+    if (window.location.pathname.includes('reset-password') || urlToken) {
       setIsResetPage(true);
-      if (emailParam) setResetData(prev => ({ ...prev, email: emailParam }));
+      if (urlToken) setResetToken(urlToken);
     }
+    
     if (token) fetchTasks();
   }, [token]);
 
@@ -130,7 +136,7 @@ export default function App() {
           <div className="flex flex-col items-center mb-6">
             <div className="bg-green-100 p-4 rounded-full text-green-600 mb-4"><Lock size={40} /></div>
             <h2 className="text-2xl font-bold text-gray-800 text-center">Set New Password</h2>
-            <p className="text-sm text-gray-400 mt-2 italic text-center break-all">Resetting for: {resetData.email}</p>
+            <p className="text-sm text-gray-400 mt-2 italic text-center">กรุณาตั้งรหัสผ่านใหม่ของคุณ</p>
           </div>
           <form onSubmit={async (e) => {
             e.preventDefault();
@@ -138,12 +144,16 @@ export default function App() {
               const res = await fetch(`${API_URL}/api/reset-password`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: resetData.email, newPassword: resetData.newPassword })
+                // ✨ แก้ไขจุดนี้: ส่ง token แทน email
+                body: JSON.stringify({ token: resetToken, newPassword: resetData.newPassword })
               });
+              
+              const data = await res.json();
+              
               if (res.ok) {
                 alert("✅ เปลี่ยนรหัสผ่านสำเร็จ! กรุณาเข้าสู่ระบบด้วยรหัสใหม่");
                 window.location.href = "/";
-              } else alert("❌ เกิดข้อผิดพลาดในการเปลี่ยนรหัส");
+              } else alert(`❌ ${data.error || "เกิดข้อผิดพลาดในการเปลี่ยนรหัส"}`);
             } catch (err) { alert("❌ ไม่สามารถติดต่อเซิร์ฟเวอร์ได้"); }
           }} className="space-y-4">
             <input required type="password" placeholder="New Password (min 6 chars)" 
@@ -387,6 +397,7 @@ export default function App() {
         </div>
       )}
 
+      {/* Detail Modal */}
       {isDetailModalOpen && selectedTask && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-center items-end sm:items-center z-50 p-0 sm:p-4">
           <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md p-6 sm:p-8 animate-in slide-in-from-bottom sm:zoom-in duration-200">
