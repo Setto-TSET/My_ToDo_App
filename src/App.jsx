@@ -264,6 +264,7 @@ export default function App() {
             <thead className="bg-gray-50/50 text-gray-400 font-bold text-[10px] uppercase tracking-widest border-b">
               <tr>
                 <th className="px-8 py-5">Task Name</th>
+                <th className="px-8 py-5">Creator</th>
                 <th className="px-8 py-5">Status</th>
                 <th className="px-8 py-5">Due Date</th>
                 <th className="px-8 py-5">Assignees</th> 
@@ -275,7 +276,9 @@ export default function App() {
                 <tr key={task.id} className="hover:bg-blue-50/30 transition cursor-pointer group">
                   <td className="px-8 py-5" onClick={() => { setSelectedTask(task); setIsDetailModalOpen(true); }}>
                     <span className="font-bold text-gray-700 group-hover:text-blue-600 transition">{task.title}</span>
+                    <td className="px-8 py-5 text-sm text-blue-600 font-medium">@{task.ownerName}</td>
                   </td>
+                  
                   <td className="px-8 py-5" onClick={() => { setSelectedTask(task); setIsDetailModalOpen(true); }}>
                     <span className={`px-3 py-1 rounded-full text-[10px] font-bold ${task.status === 'Completed' ? 'bg-green-100 text-green-700' : task.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'}`}>{task.status}</span>
                   </td>

@@ -162,6 +162,7 @@ app.get('/api/tasks', authenticateToken, async (req, res) => {
   try {
     const query = `
       SELECT t.*, c.name as category, u_owner.username as ownerName,
+      u_owner.username as ownerName,
       DATE_FORMAT(t.due_date, '%Y-%m-%d') as due_date,
       GROUP_CONCAT(DISTINCT u_assignee.username) as assignees_string
       FROM tasks t
