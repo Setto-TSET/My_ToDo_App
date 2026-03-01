@@ -4,24 +4,19 @@ const cors = require('cors');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { Resend } = require('resend'); // ✨ เปลี่ยนเป็น Resend
+const nodemailer = require('nodemailer'); // ✨ กลับมาใช้ nodemailer
 
 const app = express();
-const resend = new Resend(process.env.RESEND_API_KEY); // ✨ Initialize Resend
 const frontendUrl = process.env.FRONTEND_URL || 'https://my-todo-app-ochre.vercel.app';
 
 // --- CORS Configuration ---
 app.use(cors({
   origin: function (origin, callback) {
-    const allowedOrigins = [
-      'https://my-todo-app-ochre.vercel.app', 
-      'http://localhost:5173',               
-      'http://localhost:3000'
-    ];
+    const allowedOrigins = ['https://my-todo-app-ochre.vercel.app', 'http://localhost:5173', 'http://localhost:3000'];
     if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
       callback(null, true);
     } else {
-      callback(new Error('CORS blocked: Domain not allowed'));
+      callback(new Error('CORS blocked'));
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -29,8 +24,6 @@ app.use(cors({
 }));
 
 app.use(express.json());
-
-// --- Database Connection ---
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -53,6 +46,27 @@ const initializeDB = async () => {
 };
 initializeDB();
 
+// --- SMTP Transporter Configuration ---
+const transporter = nodemailer.createTransport({
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true, 
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS // รหัส App Password 16 หลัก
+  },
+  tls: { rejectUnauthorized: false }
+});
+
+// ตรวจสอบความพร้อมของระบบ SMTP ตอนเริ่มระบบ
+transporter.verify((error, success) => {
+  if (error) {
+    console.log("❌ ระบบส่งเมล (SMTP) ยังไม่พร้อม:", error.message);
+  } else {
+    console.log("✅ ระบบส่งเมล (SMTP) พร้อมใช้งานแล้ว!");
+  }
+});
+
 const SECRET_KEY = process.env.JWT_SECRET;
 
 // --- Auth Middleware ---
@@ -69,13 +83,26 @@ const authenticateToken = (req, res, next) => {
 
 // --- Routes ---
 
-app.post('/api/register', async (req, res) => {
+app.post('/api/forgot-password', async (req, res) => {
+  console.log("คำขอรีเซ็ตรหัสผ่าน (SMTP):", req.body.email);
   try {
-    const { username, email, password } = req.body;
-    const hashedPassword = await bcrypt.hash(password, 10);
-    await pool.query('INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)', [username, email, hashedPassword]);
-    res.status(201).json({ message: "สมัครสมาชิกสำเร็จ!" });
-  } catch (error) { res.status(500).json({ error: "ชื่อผู้ใช้หรืออีเมลนี้มีในระบบแล้ว" }); }
+    const { email } = req.body;
+    const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+    
+    if (users.length > 0) {
+      await transporter.sendMail({
+        from: `"My ToDo App" <${process.env.EMAIL_USER}>`,
+        to: email,
+        subject: 'Reset Password',
+        html: `<p>คลิกเพื่อตั้งรหัสใหม่: <a href="${frontendUrl}/reset-password?email=${email}">Reset Password</a></p>`
+      });
+      console.log("ส่งเมลสำเร็จ !");
+    }
+    res.json({ message: "หากมีอีเมลนี้ในระบบ เราได้ส่งลิงก์ไปให้แล้วครับ" });
+  } catch (error) { 
+    console.error("SMTP Error:", error.message);
+    res.status(500).json({ error: "ส่งเมลไม่สำเร็จ: " + error.message }); 
+  }
 });
 
 app.post('/api/login', async (req, res) => {
@@ -90,32 +117,29 @@ app.post('/api/login', async (req, res) => {
   } catch (error) { res.status(500).json({ error: "ระบบขัดข้อง" }); }
 });
 
-// ✨ Reset Password Route (Resend API Version)
+// Reset Password Route 
 app.post('/api/forgot-password', async (req, res) => {
-  console.log("📨 คำขอรีเซ็ตรหัสผ่าน:", req.body.email);
+  console.log("📨 คำขอรีเซ็ตรหัสผ่าน (SMTP):", req.body.email);
   try {
     const { email } = req.body;
     const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
     
     if (users.length > 0) {
-      const { data, error } = await resend.emails.send({
-        from: 'TodoApp <onboarding@resend.dev>', // ✨ ใช้เมลนี้สำหรับ Free Tier
+      const mailOptions = {
+        from: `"My ToDo App" <${process.env.EMAIL_USER}>`,
         to: email,
-        subject: 'Reset Password - My ToDo App',
+        subject: 'Reset Password',
         html: `<p>คุณได้รับคำขอเปลี่ยนรหัสผ่าน คลิกที่ลิงก์ด้านล่างเพื่อตั้งรหัสใหม่:</p>
                <a href="${frontendUrl}/reset-password?email=${email}">เปลี่ยนรหัสผ่านที่นี่</a>`
-      });
+      };
 
-      if (error) {
-        console.error("❌ Resend Error:", error);
-        return res.status(500).json({ error: "ส่งเมลไม่สำเร็จผ่าน API" });
-      }
-      console.log("🚀 ส่งเมลสำเร็จ ID:", data.id);
+      await transporter.sendMail(mailOptions);
+      console.log("🚀 ส่งเมลสำเร็จผ่าน SMTP!");
     }
     res.json({ message: "หากมีอีเมลนี้ในระบบ เราได้ส่งลิงก์ไปให้แล้วครับ" });
   } catch (error) { 
-    console.error("❌ Backend Error:", error.message);
-    res.status(500).json({ error: "ระบบขัดข้องในการส่งเมล" }); 
+    console.error("❌ SMTP Error:", error.message);
+    res.status(500).json({ error: "ส่งเมลไม่สำเร็จ: " + error.message }); 
   }
 });
 
@@ -128,6 +152,7 @@ app.put('/api/reset-password', async (req, res) => {
   } catch (error) { res.status(500).json({ error: "เกิดข้อผิดพลาด" }); }
 });
 
+// --- Task APIs (GET, POST, PUT, DELETE) ---
 app.get('/api/tasks', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;

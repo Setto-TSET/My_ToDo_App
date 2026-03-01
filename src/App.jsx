@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, Clock, List, Plus, Search, Tag, X, Trash2, LogOut, User, Lock, Mail, Filter } from 'lucide-react';
-const API_URL = import.meta.env.VITE_API_URL || 'https://mytodoapp-production-db0e.up.railway.app';
+
+// ✨ จุดสำคัญ: ตรวจสอบให้แน่ใจว่าใช้ https:// นำหน้าเสมอ
+const API_URL = 'https://mytodoapp-production-db0e.up.railway.app';
 
 export default function App() {
-
   const [token, setToken] = useState(localStorage.getItem('token') || null);
   const [currentUser, setCurrentUser] = useState(JSON.parse(localStorage.getItem('user')) || null);
   const [isRegistering, setIsRegistering] = useState(false);
@@ -23,12 +24,14 @@ export default function App() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
 
+  // ตรวจสอบหน้า Reset Password จาก URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const emailParam = params.get('email');
-    if (window.location.pathname === '/reset-password' || emailParam) {
+    // เช็คทั้ง pathname หรือ params เพื่อความชัวร์บน Vercel
+    if (window.location.pathname.includes('reset-password') || emailParam) {
       setIsResetPage(true);
-      setResetData(prev => ({ ...prev, email: emailParam }));
+      if (emailParam) setResetData(prev => ({ ...prev, email: emailParam }));
     }
     if (token) fetchTasks();
   }, [token]);
@@ -49,7 +52,7 @@ export default function App() {
     e.preventDefault();
     const endpoint = isRegistering ? '/api/register' : '/api/login';
     try {
-      const res = await fetch(`${API_URL}${endpoint}`, { // ✨ แก้เป็น https
+      const res = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(authForm)
@@ -57,7 +60,7 @@ export default function App() {
       const data = await res.json();
       if (res.ok) {
         if (isRegistering) {
-          alert('สมัครสมาชิกสำเร็จ!');
+          alert('สมัครสมาชิกสำเร็จ! กรุณาเข้าสู่ระบบ');
           setIsRegistering(false);
         } else {
           setToken(data.token);
@@ -66,7 +69,7 @@ export default function App() {
           localStorage.setItem('user', JSON.stringify(data.user));
         }
       } else alert(data.error || "เกิดข้อผิดพลาด");
-    } catch (error) { alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้'); }
+    } catch (error) { alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ HTTPS ได้'); }
   };
 
   const handleLogout = () => {
@@ -74,10 +77,12 @@ export default function App() {
     setCurrentUser(null);
     localStorage.clear();
     setTasks([]);
+    window.location.href = "/";
   };
 
+  // --- Task Operations ---
   const handleClearCompleted = async () => {
-    if (!window.confirm("คุณต้องการลบงานที่ทำสำเร็จแล้วทั้งหมดใช่หรือไม่?")) return;
+    if (!window.confirm("คุณต้องการลบงานที่สำเร็จแล้วทั้งหมดใช่หรือไม่?")) return;
     try {
       const res = await fetch(`${API_URL}/api/tasks/completed`, {
         method: 'DELETE',
@@ -85,7 +90,6 @@ export default function App() {
       });
       if (res.ok) {
         setTasks(tasks.filter(t => t.status !== 'Completed'));
-        alert("เคลียร์งานสำเร็จแล้วครับ");
       }
     } catch (error) { console.error("Clear Error:", error); }
   };
@@ -123,46 +127,54 @@ export default function App() {
     return matchesSearch && matchesStatus;
   });
 
-  if (!token) {
-    if (isResetPage) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-          <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md">
-            <div className="flex flex-col items-center mb-6">
-              <div className="bg-green-100 p-4 rounded-full text-green-600 mb-4"><Lock size={40} /></div>
-              <h2 className="text-2xl font-bold text-gray-800">New Password</h2>
-              <p className="text-sm text-gray-400 mt-2 italic text-center">Resetting for: {resetData.email}</p>
-            </div>
-            <form onSubmit={async (e) => {
-              e.preventDefault();
+  // --- Render Reset Password Page ---
+  if (!token && isResetPage) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+        <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md border border-green-50">
+          <div className="flex flex-col items-center mb-6">
+            <div className="bg-green-100 p-4 rounded-full text-green-600 mb-4"><Lock size={40} /></div>
+            <h2 className="text-2xl font-bold text-gray-800">Set New Password</h2>
+            <p className="text-sm text-gray-400 mt-2 italic text-center">Resetting for: {resetData.email}</p>
+          </div>
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            try {
               const res = await fetch(`${API_URL}/api/reset-password`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: resetData.email, newPassword: resetData.newPassword })
               });
               if (res.ok) {
-                alert("✅ เปลี่ยนรหัสผ่านสำเร็จ!");
-                setIsResetPage(false);
+                alert("✅ เปลี่ยนรหัสผ่านสำเร็จ! กรุณาเข้าสู่ระบบด้วยรหัสใหม่");
                 window.location.href = "/";
-              } else alert("❌ เกิดข้อผิดพลาด");
-            }} className="space-y-4">
-              <input required type="password" placeholder="At least 6 characters" className="w-full border p-3 rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
-                value={resetData.newPassword} onChange={e => setResetData({...resetData, newPassword: e.target.value})} />
-              <button type="submit" className="w-full bg-green-600 text-white py-3 rounded-xl font-bold">Update Password</button>
-            </form>
-          </div>
+              } else alert("❌ เกิดข้อผิดพลาดในการเปลี่ยนรหัส");
+            } catch (err) { alert("❌ ไม่สามารถติดต่อเซิร์ฟเวอร์ได้"); }
+          }} className="space-y-4">
+            <input required type="password" placeholder="New Password (min 6 chars)" 
+              className="w-full border p-3 rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
+              value={resetData.newPassword} onChange={e => setResetData({...resetData, newPassword: e.target.value})} />
+            <button type="submit" className="w-full bg-green-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-green-700 transition">Update Password</button>
+            <button type="button" onClick={() => window.location.href="/"} className="w-full text-gray-400 text-sm">Cancel</button>
+          </form>
         </div>
-      );
-    }
+      </div>
+    );
+  }
 
-    if (isForgotPassword) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-          <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
-            <h2 className="text-2xl font-bold text-center mb-4">Forgot Password</h2>
-            <p className="text-gray-500 text-center mb-6 text-sm">เราจะส่งลิงก์กู้คืนรหัสผ่านไปให้ทางอีเมลครับ</p>
-            <form onSubmit={async (e) => {
-              e.preventDefault();
+  // --- Render Forgot Password Flow ---
+  if (!token && isForgotPassword) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
+          <div className="flex flex-col items-center mb-6">
+            <div className="bg-blue-100 p-4 rounded-full text-blue-600 mb-4"><Mail size={40} /></div>
+            <h2 className="text-2xl font-bold text-center">Forgot Password</h2>
+            <p className="text-gray-500 text-center mt-2 text-sm">เราจะส่งลิงก์กู้คืนรหัสผ่านไปให้ทางอีเมลครับ</p>
+          </div>
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            try {
               const res = await fetch(`${API_URL}/api/forgot-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -171,17 +183,20 @@ export default function App() {
               const data = await res.json();
               alert(data.message || "หากมีอีเมลในระบบ เราได้ส่งลิงก์ไปแล้วครับ");
               setIsForgotPassword(false);
-            }} className="space-y-4">
-              <input type="email" placeholder="Your Email" required className="w-full border p-3 rounded-xl"
-                value={resetEmail} onChange={e => setResetEmail(e.target.value)} />
-              <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">Send Reset Link</button>
-              <button type="button" onClick={() => setIsForgotPassword(false)} className="w-full text-gray-400 text-sm mt-2">Back to Login</button>
-            </form>
-          </div>
+            } catch (err) { alert("❌ ระบบขัดข้อง"); }
+          }} className="space-y-4">
+            <input type="email" placeholder="Enter your registered email" required className="w-full border p-3 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+              value={resetEmail} onChange={e => setResetEmail(e.target.value)} />
+            <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition">Send Reset Link</button>
+            <button type="button" onClick={() => setIsForgotPassword(false)} className="w-full text-gray-400 text-sm mt-2">Back to Login</button>
+          </form>
         </div>
-      );
-    }
+      </div>
+    );
+  }
 
+  // --- Render Login/Register Page ---
+  if (!token) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
         <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md border border-gray-100">
@@ -208,9 +223,10 @@ export default function App() {
     );
   }
 
-
+  // --- Main Dashboard Render ---
   return (
     <div className="p-8 bg-gray-50 min-h-screen font-sans">
+      {/* Header Section */}
       <div className="max-w-6xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-gray-800">Task Dashboard</h1>
@@ -227,6 +243,7 @@ export default function App() {
         </div>
       </div>
 
+      {/* Filter & Search Section */}
       <div className="max-w-6xl mx-auto mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative w-full md:max-w-md">
           <Search className="absolute left-4 top-3 text-gray-300" size={18} />
@@ -240,6 +257,7 @@ export default function App() {
         </div>
       </div>
 
+      {/* Tasks Table */}
       <div className="max-w-6xl mx-auto bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
@@ -261,9 +279,8 @@ export default function App() {
                   <td className="px-8 py-5" onClick={() => { setSelectedTask(task); setIsDetailModalOpen(true); }}>
                     <span className={`px-3 py-1 rounded-full text-[10px] font-bold ${task.status === 'Completed' ? 'bg-green-100 text-green-700' : task.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'}`}>{task.status}</span>
                   </td>
-
                   <td className="px-8 py-5 text-gray-400 text-sm" onClick={() => { setSelectedTask(task); setIsDetailModalOpen(true); }}>
-                    {task.dueDate ? task.dueDate : '-'}
+                    {task.dueDate || '-'}
                   </td>
                   <td className="px-8 py-5">
                     <div className="flex -space-x-2 overflow-hidden">
@@ -273,7 +290,7 @@ export default function App() {
                     </div>
                   </td>
                   <td className="px-8 py-5 text-right">
-                    <button onClick={() => handleDeleteTask(task.id)} className="text-gray-300 hover:text-red-500 transition"><Trash2 size={18}/></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }} className="text-gray-300 hover:text-red-500 transition"><Trash2 size={18}/></button>
                   </td>
                 </tr>
               )) : (
@@ -284,6 +301,7 @@ export default function App() {
         </div>
       </div>
 
+      {/* Add Task Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 animate-in fade-in zoom-in duration-200">
@@ -299,19 +317,11 @@ export default function App() {
                   headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                   body: JSON.stringify(newTask)
                 });
-                
-                const contentType = res.headers.get("content-type");
-                if (contentType && contentType.indexOf("application/json") !== -1) {
-                  const data = await res.json();
-                  if (res.ok) {
-                    setIsModalOpen(false);
-                    setNewTask({ title: '', category: 'Work', status: 'Pending', dueDate: '', assignees: '' });
-                    fetchTasks(); 
-                    alert("✅ " + (data.message || "สร้างงานสำเร็จ"));
-                  } else alert("❌ " + (data.error || "สร้างงานไม่สำเร็จ"));
-                } else {
-                  alert("❌ เซิร์ฟเวอร์ขัดข้อง (กรุณาเช็คว่ารัน Backend หรือยัง?)");
-                }
+                if (res.ok) {
+                  setIsModalOpen(false);
+                  setNewTask({ title: '', category: 'Work', status: 'Pending', dueDate: '', assignees: '' });
+                  fetchTasks();
+                } else alert("❌ สร้างงานไม่สำเร็จ");
               } catch (err) { alert("❌ ไม่สามารถติดต่อเซิร์ฟเวอร์ได้"); }
             }} className="space-y-4">
               <input required type="text" placeholder="Task Title" className="w-full bg-gray-50 border-none p-3 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
@@ -322,7 +332,6 @@ export default function App() {
                 <select className="bg-gray-50 border-none p-3 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={newTask.category} onChange={e => setNewTask({...newTask, category: e.target.value})}>
                   <option value="Work">Work</option><option value="Personal">Personal</option><option value="Education">Education</option>
                 </select>
-
                 <input type="date" className="bg-gray-50 border-none p-3 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" 
                   value={newTask.dueDate} onChange={e => setNewTask({...newTask, dueDate: e.target.value})} />
               </div>
@@ -332,6 +341,7 @@ export default function App() {
         </div>
       )}
 
+      {/* Task Detail Modal */}
       {isDetailModalOpen && selectedTask && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -339,24 +349,18 @@ export default function App() {
               <h3 className="text-2xl font-bold text-gray-800">{selectedTask.title}</h3>
               <button onClick={() => setIsDetailModalOpen(false)} className="text-gray-400 hover:bg-gray-100 rounded-full p-1 transition"><X size={24}/></button>
             </div>
-            <div className="mb-6"><label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">ผู้ที่เกี่ยวข้อง</label>
-              <div className="flex flex-wrap gap-2">
-                {selectedTask.assignees?.length > 0 ? selectedTask.assignees.map((name, i) => (
-                  <span key={i} className="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg text-xs font-bold border border-blue-100">@{name}</span>
-                )) : <span className="text-gray-300 italic text-xs">No assignees tagged</span>}
-              </div>
-            </div>
             <div className="grid grid-cols-2 gap-4 mb-6">
-              <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">Status</label>
+              <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Status</label>
                 <select className="w-full bg-gray-50 border-none rounded-xl px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-blue-500 transition" value={selectedTask.status} onChange={(e) => handleUpdateTask('status', e.target.value)}>
                   <option value="Pending">🕒 Pending</option><option value="In Progress">🚀 In Progress</option><option value="Completed">✅ Completed</option>
                 </select>
               </div>
-              <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">Due Date</label>
+              <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Due Date</label>
                 <input type="date" className="w-full bg-gray-50 border-none rounded-xl px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-blue-500 transition" value={selectedTask.dueDate || ''} onChange={(e) => handleUpdateTask('dueDate', e.target.value)} />
               </div>
             </div>
-            <div className="flex gap-3"><button onClick={() => setIsDetailModalOpen(false)} className="flex-1 bg-gray-100 text-gray-600 py-3 rounded-2xl font-bold hover:bg-gray-200 transition">Close</button>
+            <div className="flex gap-3">
+              <button onClick={() => setIsDetailModalOpen(false)} className="flex-1 bg-gray-100 text-gray-600 py-3 rounded-2xl font-bold hover:bg-gray-200 transition">Close</button>
               <button onClick={() => handleDeleteTask(selectedTask.id)} className="flex-1 bg-red-50 text-red-500 py-3 rounded-2xl font-bold hover:bg-red-500 hover:text-white transition">Delete</button>
             </div>
           </div>
