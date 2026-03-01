@@ -121,7 +121,6 @@ app.post('/api/login', async (req, res) => {
   } catch (error) { res.status(500).json({ error: "ระบบขัดข้อง" }); }
 });
 
-// ✨ Route Forgot Password ที่เปลี่ยนมาใช้ API
 app.post('/api/forgot-password', async (req, res) => {
   console.log("📨 คำขอรีเซ็ตรหัสผ่าน (HTTPS API):", req.body.email);
   try {
@@ -132,10 +131,9 @@ app.post('/api/forgot-password', async (req, res) => {
       const htmlContent = `<div style="font-family: sans-serif; text-align: center; padding: 20px;">
                  <h2>คำขอเปลี่ยนรหัสผ่าน</h2>
                  <p>คุณได้รับคำขอเปลี่ยนรหัสผ่าน คลิกที่ปุ่มด้านล่างเพื่อตั้งรหัสใหม่:</p>
-                 <a href="${frontendUrl}/reset-password?email=${email}" style="display: inline-block; padding: 10px 20px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 10px;">ตั้งรหัสผ่านใหม่</a>
+                 <a href="${frontendUrl}/?email=${email}" style="display: inline-block; padding: 10px 20px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 10px;">ตั้งรหัสผ่านใหม่</a>
                </div>`;
 
-      // เรียกใช้ฟังก์ชันส่งเมลที่เราเขียนขึ้นเอง
       await sendMailViaAPI(email, 'Reset Password - My ToDo App', htmlContent);
       console.log("🚀 ส่งเมลสำเร็จผ่าน Gmail HTTPS API แบบไม่ผ่าน SMTP!");
     }
