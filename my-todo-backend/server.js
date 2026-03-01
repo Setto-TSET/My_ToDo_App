@@ -5,10 +5,9 @@ const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { google } = require('googleapis');
+const frontendUrl = 'https://my-to-do-app-ochre.vercel.app';
 
 const app = express();
-// ตัด Slash ตัวสุดท้ายออกเพื่อป้องกัน URL เบิ้ล (เช่น .app//reset-password)
-const frontendUrl = (process.env.FRONTEND_URL || 'https://my-to-do-app-ochre.vercel.app').replace(/\/$/, '');
 const SECRET_KEY = process.env.JWT_SECRET;
 const PORT = process.env.PORT || 8080;
 
