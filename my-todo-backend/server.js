@@ -1,3 +1,6 @@
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first');
+
 require('dotenv').config(); 
 const express = require('express');
 const cors = require('cors');
@@ -49,13 +52,14 @@ initializeDB();
 // --- SMTP Transporter Configuration ---
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, 
+  port: 587,
+  secure: false, 
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS // รหัส App Password 16 หลัก
   },
-  tls: { rejectUnauthorized: false },
+  tls: { minVersion: 'TLSv1.2'
+    ,rejectUnauthorized: false },
   family: 4
 });
 
