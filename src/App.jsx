@@ -387,7 +387,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Task Detail Modal */}
       {isDetailModalOpen && selectedTask && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-center items-end sm:items-center z-50 p-0 sm:p-4">
           <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md p-6 sm:p-8 animate-in slide-in-from-bottom sm:zoom-in duration-200">
