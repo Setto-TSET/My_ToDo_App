@@ -7,12 +7,12 @@ const jwt = require('jsonwebtoken');
 const { google } = require('googleapis'); // ✨ ใช้ Google APIs แทน Nodemailer
 
 const app = express();
-const frontendUrl = process.env.FRONTEND_URL || 'https://my-todo-app-ochre.vercel.app';
+const frontendUrl = process.env.FRONTEND_URL || 'https://my-to-do-app-ochre.vercel.app';
 
 // --- CORS Configuration ---
 app.use(cors({
   origin: function (origin, callback) {
-    const allowedOrigins = ['https://my-todo-app-ochre.vercel.app', 'http://localhost:5173', 'http://localhost:3000'];
+    const allowedOrigins = ['https://my-to-do-app-ochre.vercel.app', 'http://localhost:5173', 'http://localhost:3000'];
     if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
       callback(null, true);
     } else {
