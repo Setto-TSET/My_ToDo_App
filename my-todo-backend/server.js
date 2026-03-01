@@ -1,5 +1,5 @@
 const dns = require('dns');
-dns.setDefaultResultOrder('ipv4first');
+dns.setDefaultResultOrder('ipv4first'); // ✨ บังคับ IPv4 ป้องกัน Error ระดับ Network
 
 require('dotenv').config(); 
 const express = require('express');
@@ -7,7 +7,7 @@ const cors = require('cors');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer'); // ✨ กลับมาใช้ nodemailer
+const nodemailer = require('nodemailer');
 
 const app = express();
 const frontendUrl = process.env.FRONTEND_URL || 'https://my-todo-app-ochre.vercel.app';
@@ -27,6 +27,8 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// --- Database Connection ---
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -49,6 +51,7 @@ const initializeDB = async () => {
 };
 initializeDB();
 
+// --- ✨ Gmail API (OAuth2) Configuration ---
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -57,13 +60,17 @@ const transporter = nodemailer.createTransport({
     clientId: process.env.GMAIL_CLIENT_ID,
     clientSecret: process.env.GMAIL_CLIENT_SECRET,
     refreshToken: process.env.GMAIL_REFRESH_TOKEN
+  },
+  family: 4, // ✨ เติมให้แล้ว! บังคับ IPv4 เพื่อแก้ปัญหา ENETUNREACH
+  tls: {
+    rejectUnauthorized: false
   }
 });
 
-// เช็คสถานะการเชื่อมต่อ
+// ตรวจสอบความพร้อมตอนรันเซิร์ฟเวอร์
 transporter.verify((error) => {
   if (error) console.log("❌ Gmail API Error:", error.message);
-  else console.log("🚀 Gmail API (OAuth2) พร้อมใช้งานแล้วครับ!");
+  else console.log("🚀 Gmail API (OAuth2) พร้อมใช้งานและทะลุ Firewall แล้ว!");
 });
 
 const SECRET_KEY = process.env.JWT_SECRET;
@@ -82,26 +89,13 @@ const authenticateToken = (req, res, next) => {
 
 // --- Routes ---
 
-app.post('/api/forgot-password', async (req, res) => {
-  console.log("คำขอรีเซ็ตรหัสผ่าน (SMTP):", req.body.email);
+app.post('/api/register', async (req, res) => {
   try {
-    const { email } = req.body;
-    const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-    
-    if (users.length > 0) {
-      await transporter.sendMail({
-        from: `"My ToDo App" <${process.env.EMAIL_USER}>`,
-        to: email,
-        subject: 'Reset Password',
-        html: `<p>คลิกเพื่อตั้งรหัสใหม่: <a href="${frontendUrl}/reset-password?email=${email}">Reset Password</a></p>`
-      });
-      console.log("ส่งเมลสำเร็จ !");
-    }
-    res.json({ message: "หากมีอีเมลนี้ในระบบ เราได้ส่งลิงก์ไปให้แล้วครับ" });
-  } catch (error) { 
-    console.error("SMTP Error:", error.message);
-    res.status(500).json({ error: "ส่งเมลไม่สำเร็จ: " + error.message }); 
-  }
+    const { username, email, password } = req.body;
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await pool.query('INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)', [username, email, hashedPassword]);
+    res.status(201).json({ message: "สมัครสมาชิกสำเร็จ!" });
+  } catch (error) { res.status(500).json({ error: "ชื่อผู้ใช้หรืออีเมลนี้มีในระบบแล้ว" }); }
 });
 
 app.post('/api/login', async (req, res) => {
@@ -116,9 +110,9 @@ app.post('/api/login', async (req, res) => {
   } catch (error) { res.status(500).json({ error: "ระบบขัดข้อง" }); }
 });
 
-// Reset Password Route 
+// ✨ รวม Route Forgot Password ให้เหลืออันเดียวที่สมบูรณ์ที่สุด
 app.post('/api/forgot-password', async (req, res) => {
-  console.log("📨 คำขอรีเซ็ตรหัสผ่าน (SMTP):", req.body.email);
+  console.log("📨 คำขอรีเซ็ตรหัสผ่าน (OAuth2):", req.body.email);
   try {
     const { email } = req.body;
     const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
@@ -127,17 +121,20 @@ app.post('/api/forgot-password', async (req, res) => {
       const mailOptions = {
         from: `"My ToDo App" <${process.env.EMAIL_USER}>`,
         to: email,
-        subject: 'Reset Password',
-        html: `<p>คุณได้รับคำขอเปลี่ยนรหัสผ่าน คลิกที่ลิงก์ด้านล่างเพื่อตั้งรหัสใหม่:</p>
-               <a href="${frontendUrl}/reset-password?email=${email}">เปลี่ยนรหัสผ่านที่นี่</a>`
+        subject: 'Reset Password - My ToDo App',
+        html: `<div style="font-family: sans-serif; text-align: center; padding: 20px;">
+                 <h2>คำขอเปลี่ยนรหัสผ่าน</h2>
+                 <p>คุณได้รับคำขอเปลี่ยนรหัสผ่าน คลิกที่ปุ่มด้านล่างเพื่อตั้งรหัสใหม่:</p>
+                 <a href="${frontendUrl}/reset-password?email=${email}" style="display: inline-block; padding: 10px 20px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 10px;">ตั้งรหัสผ่านใหม่</a>
+               </div>`
       };
 
       await transporter.sendMail(mailOptions);
-      console.log("🚀 ส่งเมลสำเร็จผ่าน SMTP!");
+      console.log("🚀 ส่งเมลสำเร็จผ่าน Gmail API!");
     }
     res.json({ message: "หากมีอีเมลนี้ในระบบ เราได้ส่งลิงก์ไปให้แล้วครับ" });
   } catch (error) { 
-    console.error("❌ SMTP Error:", error.message);
+    console.error("❌ Email API Error:", error.message);
     res.status(500).json({ error: "ส่งเมลไม่สำเร็จ: " + error.message }); 
   }
 });
@@ -151,12 +148,12 @@ app.put('/api/reset-password', async (req, res) => {
   } catch (error) { res.status(500).json({ error: "เกิดข้อผิดพลาด" }); }
 });
 
-// --- Task APIs (GET, POST, PUT, DELETE) ---
+// --- Task APIs ---
 app.get('/api/tasks', authenticateToken, async (req, res) => {
   try {
     const query = `
-      SELECT t.*, c.name as category, u_owner.username as ownerName,
-      u_owner.username as ownerName,
+      SELECT t.*, c.name as category, 
+      u_owner.username as ownerName, -- ✨ ลบส่วนที่พิมพ์ซ้ำออกแล้ว
       DATE_FORMAT(t.due_date, '%Y-%m-%d') as due_date,
       GROUP_CONCAT(DISTINCT u_assignee.username) as assignees_string
       FROM tasks t
