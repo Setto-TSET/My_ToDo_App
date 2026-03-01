@@ -4,10 +4,13 @@ const cors = require('cors');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
-const frontendUrl = process.env.FRONTEND_URL;
+const { Resend } = require('resend'); // ✨ เปลี่ยนเป็น Resend
 
 const app = express();
+const resend = new Resend(process.env.RESEND_API_KEY); // ✨ Initialize Resend
+const frontendUrl = process.env.FRONTEND_URL || 'https://my-todo-app-ochre.vercel.app';
+
+// --- CORS Configuration ---
 app.use(cors({
   origin: function (origin, callback) {
     const allowedOrigins = [
@@ -15,7 +18,6 @@ app.use(cors({
       'http://localhost:5173',               
       'http://localhost:3000'
     ];
-
     if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
       callback(null, true);
     } else {
@@ -28,6 +30,7 @@ app.use(cors({
 
 app.use(express.json());
 
+// --- Database Connection ---
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -36,55 +39,23 @@ const pool = mysql.createPool({
   dateStrings: true, 
   port: process.env.DB_PORT || 3306 
 });
+
 const initializeDB = async () => {
   try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        username VARCHAR(255) UNIQUE NOT NULL,
-        email VARCHAR(255) UNIQUE NOT NULL,
-        password_hash VARCHAR(255) NOT NULL
-      )
-    `);
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS categories (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        user_id INT,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-      )
-    `);
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS tasks (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        title VARCHAR(255) NOT NULL,
-        status VARCHAR(50) DEFAULT 'Pending',
-        due_date DATE,
-        category_id INT,
-        owner_id INT,
-        FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
-        FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
-      )
-    `);
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS task_assignees (
-        task_id INT,
-        user_id INT,
-        PRIMARY KEY (task_id, user_id),
-        FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-      )
-    `);
-    console.log("ตรวจสอบและสร้างตารางใน Database สำเร็จ!");
+    await pool.query(`CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(255) UNIQUE NOT NULL, email VARCHAR(255) UNIQUE NOT NULL, password_hash VARCHAR(255) NOT NULL)`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS categories (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL, user_id INT, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS tasks (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(255) NOT NULL, status VARCHAR(50) DEFAULT 'Pending', due_date DATE, category_id INT, owner_id INT, FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL, FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE)`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS task_assignees (task_id INT, user_id INT, PRIMARY KEY (task_id, user_id), FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)`);
+    console.log("✅ ตรวจสอบและสร้างตารางใน Database สำเร็จ!");
   } catch (error) {
-    console.error("เกิดข้อผิดพลาดในการสร้างตาราง:", error.message);
+    console.error("❌ เกิดข้อผิดพลาดในการสร้างตาราง:", error.message);
   }
 };
+initializeDB();
 
-initializeDB(); 
 const SECRET_KEY = process.env.JWT_SECRET;
 
-
+// --- Auth Middleware ---
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; 
@@ -96,20 +67,7 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false,
-  pool: true,    
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  tls: {
-    rejectUnauthorized: false,
-    minVersion: 'TLSv1.2'
-  }
-});
+// --- Routes ---
 
 app.post('/api/register', async (req, res) => {
   try {
@@ -132,30 +90,32 @@ app.post('/api/login', async (req, res) => {
   } catch (error) { res.status(500).json({ error: "ระบบขัดข้อง" }); }
 });
 
+// ✨ Reset Password Route (Resend API Version)
 app.post('/api/forgot-password', async (req, res) => {
-  console.log("📨 กำลังตรวจสอบอีเมล:", req.body.email);
+  console.log("📨 คำขอรีเซ็ตรหัสผ่าน:", req.body.email);
   try {
     const { email } = req.body;
     const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
     
     if (users.length > 0) {
-      console.log("พบผู้ใช้ในระบบ กำลังพยายามส่งเมล...");
-      const mailOptions = {
-        from: `"Admin" <${process.env.EMAIL_USER}>`,
+      const { data, error } = await resend.emails.send({
+        from: 'TodoApp <onboarding@resend.dev>', // ✨ ใช้เมลนี้สำหรับ Free Tier
         to: email,
-        subject: 'Reset Password',
-        html: `<p>คลิกเพื่อตั้งรหัสใหม่: <a href="${process.env.FRONTEND_URL}/reset-password?email=${email}">Reset Password</a></p>`
-      };
-      
-      const info = await transporter.sendMail(mailOptions);
-      console.log("ส่งเมลสำเร็จ! ID:", info.messageId);
-    } else {
-      console.log("ไม่พบอีเมลนี้ในระบบ");
+        subject: 'Reset Password - My ToDo App',
+        html: `<p>คุณได้รับคำขอเปลี่ยนรหัสผ่าน คลิกที่ลิงก์ด้านล่างเพื่อตั้งรหัสใหม่:</p>
+               <a href="${frontendUrl}/reset-password?email=${email}">เปลี่ยนรหัสผ่านที่นี่</a>`
+      });
+
+      if (error) {
+        console.error("❌ Resend Error:", error);
+        return res.status(500).json({ error: "ส่งเมลไม่สำเร็จผ่าน API" });
+      }
+      console.log("🚀 ส่งเมลสำเร็จ ID:", data.id);
     }
     res.json({ message: "หากมีอีเมลนี้ในระบบ เราได้ส่งลิงก์ไปให้แล้วครับ" });
   } catch (error) { 
-    console.error("เกิดข้อผิดพลาดการส่งเมล:", error.message);
-    res.status(500).json({ error: "ส่งเมลไม่สำเร็จ: " + error.message }); 
+    console.error("❌ Backend Error:", error.message);
+    res.status(500).json({ error: "ระบบขัดข้องในการส่งเมล" }); 
   }
 });
 
@@ -201,10 +161,7 @@ const getOrCreateCategoryId = async (categoryName, userId) => {
 
 const updateAssignees = async (taskId, assignees) => {
   if (!assignees) return;
-  const assigneeList = Array.isArray(assignees) 
-    ? assignees 
-    : String(assignees).split(',').map(s => s.trim()).filter(s => s !== "");
-
+  const assigneeList = Array.isArray(assignees) ? assignees : String(assignees).split(',').map(s => s.trim()).filter(s => s !== "");
   await pool.query('DELETE FROM task_assignees WHERE task_id = ?', [taskId]);
   if (assigneeList.length > 0) {
     const [users] = await pool.query('SELECT id FROM users WHERE username IN (?)', [assigneeList]);
@@ -220,12 +177,7 @@ app.post('/api/tasks', authenticateToken, async (req, res) => {
     const { title, category, status, dueDate, assignees } = req.body;
     const userId = req.user.id;
     const categoryId = await getOrCreateCategoryId(category, userId);
-
-    const [result] = await pool.query(
-      'INSERT INTO tasks (title, status, due_date, owner_id, category_id) VALUES (?, ?, ?, ?, ?)',
-      [title, status, dueDate || null, userId, categoryId]
-    );
-
+    const [result] = await pool.query('INSERT INTO tasks (title, status, due_date, owner_id, category_id) VALUES (?, ?, ?, ?, ?)', [title, status, dueDate || null, userId, categoryId]);
     await updateAssignees(result.insertId, assignees);
     res.status(201).json({ message: "เพิ่มงานสำเร็จ" });
   } catch (error) { res.status(500).json({ error: "เพิ่มงานไม่สำเร็จ: " + error.message }); }
@@ -237,12 +189,7 @@ app.put('/api/tasks/:id', authenticateToken, async (req, res) => {
     const { title, category, status, dueDate, assignees } = req.body;
     const userId = req.user.id;
     const categoryId = await getOrCreateCategoryId(category, userId);
-
-    await pool.query(
-      'UPDATE tasks SET title = ?, status = ?, due_date = ?, category_id = ? WHERE id = ? AND owner_id = ?',
-      [title, status, dueDate || null, categoryId, id, userId]
-    );
-
+    await pool.query('UPDATE tasks SET title = ?, status = ?, due_date = ?, category_id = ? WHERE id = ? AND owner_id = ?', [title, status, dueDate || null, categoryId, id, userId]);
     await updateAssignees(id, assignees);
     res.json({ message: "อัปเดตสำเร็จ" });
   } catch (error) { res.status(500).json({ error: "อัปเดตไม่สำเร็จ" }); }
@@ -262,9 +209,7 @@ app.delete('/api/tasks/:id', authenticateToken, async (req, res) => {
   } catch (error) { res.status(500).json({ error: "ลบไม่สำเร็จ" }); }
 });
 
-
-const PORT = process.env.PORT || 5000; 
-
+const PORT = process.env.PORT || 8080; 
 app.listen(PORT, () => {
-  console.log(` Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
