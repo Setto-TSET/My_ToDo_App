@@ -1,14 +1,10 @@
-const dns = require('dns');
-// ✨ บังคับ IPv4 ตั้งแต่ระดับ Node.js ป้องกัน Error ENETUNREACH
-dns.setDefaultResultOrder('ipv4first'); 
-
 require('dotenv').config(); 
 const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer'); 
+const { google } = require('googleapis'); // ✨ ใช้ Google APIs แทน Nodemailer
 
 const app = express();
 const frontendUrl = process.env.FRONTEND_URL || 'https://my-todo-app-ochre.vercel.app';
@@ -16,11 +12,7 @@ const frontendUrl = process.env.FRONTEND_URL || 'https://my-todo-app-ochre.verce
 // --- CORS Configuration ---
 app.use(cors({
   origin: function (origin, callback) {
-    const allowedOrigins = [
-      'https://my-todo-app-ochre.vercel.app', 
-      'http://localhost:5173', 
-      'http://localhost:3000'
-    ];
+    const allowedOrigins = ['https://my-todo-app-ochre.vercel.app', 'http://localhost:5173', 'http://localhost:3000'];
     if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
       callback(null, true);
     } else {
@@ -56,30 +48,41 @@ const initializeDB = async () => {
 };
 initializeDB();
 
-// --- ✨ Gmail API (OAuth2) Configuration ---
-const transporter = nodemailer.createTransport({
-  // ✨ ลบ service: 'gmail' ออก และใช้ host/port ตรงๆ เพื่อไม่ให้มันไปทับค่าบังคับ IPv4
-  host: 'smtp.gmail.com', 
-  port: 465,              
-  secure: true,           
-  auth: {
-    type: 'OAuth2',
-    user: process.env.EMAIL_USER,
-    clientId: process.env.GMAIL_CLIENT_ID,
-    clientSecret: process.env.GMAIL_CLIENT_SECRET,
-    refreshToken: process.env.GMAIL_REFRESH_TOKEN
-  },
-  family: 4, // ✨ บังคับใช้ IPv4 เท่านั้น (ทะลวง Firewall ของ Railway)
-  tls: {
-    rejectUnauthorized: false
-  }
-});
+// --- ✨ Gmail REST API (HTTPS Port 443) ---
+const oAuth2Client = new google.auth.OAuth2(
+  process.env.GMAIL_CLIENT_ID,
+  process.env.GMAIL_CLIENT_SECRET,
+  "https://developers.google.com/oauthplayground"
+);
+oAuth2Client.setCredentials({ refresh_token: process.env.GMAIL_REFRESH_TOKEN });
+const gmail = google.gmail({ version: 'v1', auth: oAuth2Client });
 
-// ตรวจสอบความพร้อมตอนรันเซิร์ฟเวอร์
-transporter.verify((error) => {
-  if (error) console.log("❌ Gmail API Error:", error.message);
-  else console.log("🚀 Gmail API (OAuth2) พร้อมใช้งานและทะลุ Firewall แล้ว!");
-});
+// ฟังก์ชันสร้างและส่งอีเมลผ่าน HTTP API (ไม่โดนบล็อกพอร์ต)
+const sendMailViaAPI = async (to, subject, htmlContent) => {
+  const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
+  const messageParts = [
+    `From: "My ToDo App" <${process.env.EMAIL_USER}>`,
+    `To: ${to}`,
+    'Content-Type: text/html; charset=utf-8',
+    'MIME-Version: 1.0',
+    `Subject: ${utf8Subject}`,
+    '',
+    htmlContent
+  ];
+  const message = messageParts.join('\n');
+  
+  // แปลงข้อมูลเป็น Base64 แบบ URL Safe
+  const encodedMessage = Buffer.from(message)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: { raw: encodedMessage }
+  });
+};
 
 const SECRET_KEY = process.env.JWT_SECRET;
 
@@ -118,27 +121,23 @@ app.post('/api/login', async (req, res) => {
   } catch (error) { res.status(500).json({ error: "ระบบขัดข้อง" }); }
 });
 
-// ✨ Route Forgot Password (มีอันเดียว ไม่ซ้ำซ้อนแล้ว)
+// ✨ Route Forgot Password ที่เปลี่ยนมาใช้ API
 app.post('/api/forgot-password', async (req, res) => {
-  console.log("📨 คำขอรีเซ็ตรหัสผ่าน (OAuth2):", req.body.email);
+  console.log("📨 คำขอรีเซ็ตรหัสผ่าน (HTTPS API):", req.body.email);
   try {
     const { email } = req.body;
     const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
     
     if (users.length > 0) {
-      const mailOptions = {
-        from: `"My ToDo App" <${process.env.EMAIL_USER}>`,
-        to: email,
-        subject: 'Reset Password - My ToDo App',
-        html: `<div style="font-family: sans-serif; text-align: center; padding: 20px;">
+      const htmlContent = `<div style="font-family: sans-serif; text-align: center; padding: 20px;">
                  <h2>คำขอเปลี่ยนรหัสผ่าน</h2>
                  <p>คุณได้รับคำขอเปลี่ยนรหัสผ่าน คลิกที่ปุ่มด้านล่างเพื่อตั้งรหัสใหม่:</p>
                  <a href="${frontendUrl}/reset-password?email=${email}" style="display: inline-block; padding: 10px 20px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 10px;">ตั้งรหัสผ่านใหม่</a>
-               </div>`
-      };
+               </div>`;
 
-      await transporter.sendMail(mailOptions);
-      console.log("🚀 ส่งเมลสำเร็จผ่าน Gmail API!");
+      // เรียกใช้ฟังก์ชันส่งเมลที่เราเขียนขึ้นเอง
+      await sendMailViaAPI(email, 'Reset Password - My ToDo App', htmlContent);
+      console.log("🚀 ส่งเมลสำเร็จผ่าน Gmail HTTPS API แบบไม่ผ่าน SMTP!");
     }
     res.json({ message: "หากมีอีเมลนี้ในระบบ เราได้ส่งลิงก์ไปให้แล้วครับ" });
   } catch (error) { 
@@ -159,7 +158,6 @@ app.put('/api/reset-password', async (req, res) => {
 // --- Task APIs ---
 app.get('/api/tasks', authenticateToken, async (req, res) => {
   try {
-    // ✨ ลบการเรียก ownerName ซ้ำซ้อนออกแล้ว
     const query = `
       SELECT t.*, c.name as category, 
       u_owner.username as ownerName, 
@@ -241,5 +239,5 @@ app.delete('/api/tasks/:id', authenticateToken, async (req, res) => {
 
 const PORT = process.env.PORT || 8080; 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
