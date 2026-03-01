@@ -1,5 +1,4 @@
 // Force fresh build - UI Version 2.0
-
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, X, Trash2, LogOut, Lock, Mail, Calendar, UserCircle } from 'lucide-react';
 
