@@ -9,7 +9,21 @@ const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 const app = express();
 app.use(cors({
-  origin: ['https://my-todo-app-ochre.vercel.app', 'http://localhost:5173'],
+  origin: function (origin, callback) {
+    // รายการโดเมนที่อนุญาตแบบตายตัว
+    const allowedOrigins = [
+      'https://my-todo-app-ochre.vercel.app', 
+      'http://localhost:5173',               
+      'http://localhost:3000'
+    ];
+    if (!origin || 
+        allowedOrigins.includes(origin) || 
+        origin.endsWith('.vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS blocked: Domain not allowed'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 }));
