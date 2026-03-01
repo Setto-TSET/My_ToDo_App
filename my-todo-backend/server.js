@@ -51,15 +51,19 @@ initializeDB();
 
 // --- SMTP Transporter Configuration ---
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
+  host: '74.125.204.108',
   port: 587,
-  secure: false, 
+  secure: false,
+  pool: true, 
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS // รหัส App Password 16 หลัก
+    pass: process.env.EMAIL_PASS 
   },
   tls: { minVersion: 'TLSv1.2'
     ,rejectUnauthorized: false },
+    connectionTimeout: 20000, 
+  greetingTimeout: 20000,
+  socketTimeout: 30000,
   family: 4
 });
 
