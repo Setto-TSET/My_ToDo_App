@@ -160,7 +160,6 @@ app.put('/api/reset-password', async (req, res) => {
 // --- Task APIs (GET, POST, PUT, DELETE) ---
 app.get('/api/tasks', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id;
     const query = `
       SELECT t.*, c.name as category, u_owner.username as ownerName,
       DATE_FORMAT(t.due_date, '%Y-%m-%d') as due_date,
@@ -170,9 +169,9 @@ app.get('/api/tasks', authenticateToken, async (req, res) => {
       LEFT JOIN users u_owner ON t.owner_id = u_owner.id
       LEFT JOIN task_assignees ta ON t.id = ta.task_id
       LEFT JOIN users u_assignee ON ta.user_id = u_assignee.id
-      WHERE t.owner_id = ? OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?)
       GROUP BY t.id`;
-    const [rows] = await pool.query(query, [userId, userId]);
+      
+    const [rows] = await pool.query(query); 
     res.json(rows.map(row => ({ 
       ...row, 
       dueDate: row.due_date, 
