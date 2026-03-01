@@ -49,31 +49,21 @@ const initializeDB = async () => {
 };
 initializeDB();
 
-// --- SMTP Transporter Configuration ---
 const transporter = nodemailer.createTransport({
-  host: '74.125.204.108',
-  port: 587,
-  secure: false,
-  pool: true, 
+  service: 'gmail',
   auth: {
+    type: 'OAuth2',
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS 
-  },
-  tls: { minVersion: 'TLSv1.2'
-    ,rejectUnauthorized: false },
-    connectionTimeout: 20000, 
-  greetingTimeout: 20000,
-  socketTimeout: 30000,
-  family: 4
+    clientId: process.env.GMAIL_CLIENT_ID,
+    clientSecret: process.env.GMAIL_CLIENT_SECRET,
+    refreshToken: process.env.GMAIL_REFRESH_TOKEN
+  }
 });
 
-// ตรวจสอบความพร้อมของระบบ SMTP ตอนเริ่มระบบ
-transporter.verify((error, success) => {
-  if (error) {
-    console.log("❌ ระบบส่งเมล (SMTP) ยังไม่พร้อม:", error.message);
-  } else {
-    console.log("✅ ระบบส่งเมล (SMTP) พร้อมใช้งานแล้ว!");
-  }
+// เช็คสถานะการเชื่อมต่อ
+transporter.verify((error) => {
+  if (error) console.log("❌ Gmail API Error:", error.message);
+  else console.log("🚀 Gmail API (OAuth2) พร้อมใช้งานแล้วครับ!");
 });
 
 const SECRET_KEY = process.env.JWT_SECRET;
