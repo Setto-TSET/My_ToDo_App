@@ -1,4 +1,3 @@
-// Force fresh build - UI Version 2.0 (Fixed Reset Password Payload)
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, X, Trash2, LogOut, Lock, Mail, Calendar, UserCircle } from 'lucide-react';
 
@@ -12,9 +11,8 @@ export default function App() {
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   
-  // สถานะสำหรับหน้าตั้งรหัสผ่านใหม่
   const [isResetPage, setIsResetPage] = useState(false);
-  const [resetToken, setResetToken] = useState(''); // เก็บ Token จาก URL
+  const [resetToken, setResetToken] = useState(''); 
   const [resetData, setResetData] = useState({ newPassword: '' });
 
   const [tasks, setTasks] = useState([]);
@@ -28,7 +26,6 @@ export default function App() {
   const [selectedTask, setSelectedTask] = useState(null);
 
   useEffect(() => {
-    // ดึงค่า token จาก URL (เช่น ?token=eyJhbG...)
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get('token');
     
@@ -128,7 +125,7 @@ export default function App() {
     return matchesSearch && matchesStatus;
   });
 
-  // --- Render Functions for Auth ---
+  //Render Functions for Auth
   if (!token && isResetPage) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
@@ -144,7 +141,6 @@ export default function App() {
               const res = await fetch(`${API_URL}/api/reset-password`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                // ✨ แก้ไขจุดนี้: ส่ง token แทน email
                 body: JSON.stringify({ token: resetToken, newPassword: resetData.newPassword })
               });
               
@@ -218,25 +214,29 @@ export default function App() {
               {isRegistering ? 'Register' : 'Sign In'}
             </button>
           </form>
-          <button onClick={() => setIsRegistering(!isRegistering)} className="w-full mt-6 text-sm text-gray-500 hover:text-blue-600 transition py-2">
-            {isRegistering ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+          <button onClick={() => setIsRegistering(!isRegistering)} className="w-full mt-6 text-sm text-gray-500 transition py-2">
+  {isRegistering ? ( <>
+                Already have an account? <span className="text-blue-600 font-semibold hover:underline">Sign In</span>
+              </>
+               ) : (
+              <>
+              Don't have an account? <span className="text-blue-600 font-semibold hover:underline">Sign Up</span>
+              </>
+              )}
           </button>
         </div>
       </div>
     );
   }
 
-  // --- Main Dashboard Render ---
+  //Main Dashboard
   return (
     <div className="p-4 sm:p-8 bg-gray-50 min-h-screen font-sans pb-20 sm:pb-8">
-      {/* Header Section */}
       <div className="max-w-6xl mx-auto mb-6 sm:mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-800">Task Dashboard</h1>
           <p className="text-gray-400 text-xs sm:text-sm mt-1">ยินดีต้อนรับกลับมา, <span className="text-blue-600 font-bold">{currentUser?.username}</span></p>
         </div>
-        
-        {/* Responsive Buttons: Grid on mobile, Flex on desktop */}
         <div className="grid grid-cols-2 md:flex gap-2 sm:gap-3 w-full md:w-auto mt-2 md:mt-0">
           <button onClick={handleClearCompleted} className="col-span-1 bg-red-50 text-red-600 px-3 sm:px-4 py-2.5 rounded-xl flex items-center justify-center gap-1 sm:gap-2 font-bold hover:bg-red-500 hover:text-white transition border border-red-100 text-xs sm:text-base">
             <Trash2 size={16}/> <span className="hidden sm:inline">Clear</span>
@@ -250,14 +250,12 @@ export default function App() {
         </div>
       </div>
 
-      {/* Filter & Search Section */}
       <div className="max-w-6xl mx-auto mb-6 flex flex-col md:flex-row gap-3 items-center justify-between">
         <div className="relative w-full md:max-w-md">
           <Search className="absolute left-4 top-3 text-gray-400" size={18} />
           <input type="text" placeholder="Search tasks..." className="w-full pl-11 pr-4 py-2.5 rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm focus:ring-2 focus:ring-blue-500 outline-none text-sm"
             value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         </div>
-        {/* Scrollable Filters on Mobile */}
         <div className="flex bg-white p-1 rounded-xl sm:rounded-2xl shadow-sm gap-1 w-full md:w-auto overflow-x-auto scrollbar-hide border border-gray-100">
           {['All', 'Pending', 'In Progress', 'Completed'].map((status) => (
             <button key={status} onClick={() => setFilterStatus(status)} 
@@ -268,8 +266,6 @@ export default function App() {
           ))}
         </div>
       </div>
-
-      {/* Tasks View: Mobile Cards (Hidden on Desktop) */}
       <div className="grid grid-cols-1 gap-3 md:hidden max-w-6xl mx-auto">
         {filteredTasks.length > 0 ? filteredTasks.map(task => (
           <div key={task.id} onClick={() => { setSelectedTask(task); setIsDetailModalOpen(true); }} 
@@ -287,12 +283,10 @@ export default function App() {
                 {task.status}
               </span>
             </div>
-
             <div className="flex justify-between items-end mt-1">
               <div className="flex items-center gap-1.5 text-xs text-gray-400">
                 <Calendar size={12} /> {task.dueDate || 'No Due Date'}
               </div>
-              
               <div className="flex -space-x-2">
                 {task.assignees?.map((name, i) => (
                   <div key={i} className="w-6 h-6 rounded-full bg-blue-600 border border-white flex items-center justify-center text-[8px] text-white font-bold shadow-sm">
@@ -308,8 +302,6 @@ export default function App() {
           </div>
         )}
       </div>
-
-      {/* Tasks View: Desktop Table (Hidden on Mobile) */}
       <div className="hidden md:block max-w-6xl mx-auto bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
@@ -353,8 +345,6 @@ export default function App() {
           </table>
         </div>
       </div>
-
-      {/* Add Task Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 sm:p-8 animate-in fade-in zoom-in duration-200">
@@ -397,7 +387,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Detail Modal */}
       {isDetailModalOpen && selectedTask && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-center items-end sm:items-center z-50 p-0 sm:p-4">
           <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md p-6 sm:p-8 animate-in slide-in-from-bottom sm:zoom-in duration-200">
