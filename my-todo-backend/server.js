@@ -11,9 +11,6 @@ const app = express();
 const SECRET_KEY = process.env.JWT_SECRET;
 const PORT = process.env.PORT || 8080;
 
-// ==========================================
-// 1. CORS & Middleware Configuration
-// ==========================================
 app.use(cors({
   origin: function (origin, callback) {
     const allowedOrigins = [frontendUrl, 'http://localhost:5173', 'http://localhost:3000'];
@@ -29,16 +26,14 @@ app.use(cors({
 
 app.use(express.json());
 
-// ==========================================
-// 2. Database Configuration & Initialization
-// ==========================================
+
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
   port: Number(process.env.DB_PORT) || 3306,
-  dateStrings: true, // ทำให้ดึง Date ออกมาเป็น String (ไม่ติด Timezone)
+  dateStrings: true, 
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
@@ -57,9 +52,6 @@ const initializeDB = async () => {
 };
 initializeDB();
 
-// ==========================================
-// 3. Gmail REST API Configuration
-// ==========================================
 const oAuth2Client = new google.auth.OAuth2(
   process.env.GMAIL_CLIENT_ID,
   process.env.GMAIL_CLIENT_SECRET,
@@ -92,9 +84,6 @@ const sendMailViaAPI = async (to, subject, htmlContent) => {
   });
 };
 
-// ==========================================
-// 4. Auth Middleware
-// ==========================================
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; 
@@ -108,9 +97,6 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// ==========================================
-// 5. Auth Routes
-// ==========================================
 app.post('/api/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -162,7 +148,6 @@ app.post('/api/forgot-password', async (req, res) => {
       `;
       await sendMailViaAPI(email, 'Reset Password - My ToDo App', htmlContent);
     }
-    // ส่งข้อความแบบนี้เสมอเพื่อป้องกันการคาดเดาอีเมลในระบบ (Security Best Practice)
     res.json({ message: "หากมีอีเมลนี้ในระบบ เราได้ส่งลิงก์ไปให้แล้วครับ" });
   } catch (error) {
     console.error("Forgot Password Error:", error.message);
@@ -175,7 +160,7 @@ app.put('/api/reset-password', async (req, res) => {
     const { token, newPassword } = req.body;
     if (!token || !newPassword) return res.status(400).json({ error: "ข้อมูลไม่ครบถ้วน" });
 
-    const decoded = jwt.verify(token, SECRET_KEY); // จะเด้งไป catch ทันทีถ้า token ผิดหรือหมดอายุ
+    const decoded = jwt.verify(token, SECRET_KEY); 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     
     await pool.query('UPDATE users SET password_hash = ? WHERE email = ?', [hashedPassword, decoded.email]);
@@ -186,9 +171,7 @@ app.put('/api/reset-password', async (req, res) => {
   }
 });
 
-// ==========================================
-// 6. Task Helper Functions
-// ==========================================
+
 const getOrCreateCategoryId = async (categoryName, userId) => {
   if (!categoryName) return null;
   const [cats] = await pool.query('SELECT id FROM categories WHERE name = ? AND user_id = ?', [categoryName, userId]);
@@ -213,9 +196,6 @@ const updateAssignees = async (taskId, assignees) => {
   }
 };
 
-// ==========================================
-// 7. Task Routes
-// ==========================================
 app.get('/api/tasks', authenticateToken, async (req, res) => {
   try {
     const query = `
@@ -230,7 +210,7 @@ app.get('/api/tasks', authenticateToken, async (req, res) => {
       LEFT JOIN users u_assignee ON ta.user_id = u_assignee.id
       WHERE t.owner_id = ? 
       GROUP BY t.id
-    `; // เพิ่ม WHERE t.owner_id = ? เพื่อให้ดึงเฉพาะงานของตัวเอง
+    `; 
       
     const [rows] = await pool.query(query, [req.user.id]); 
     const tasks = rows.map(row => ({ 
@@ -306,9 +286,6 @@ app.delete('/api/tasks/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// ==========================================
-// 8. Start Server
-// ==========================================
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
