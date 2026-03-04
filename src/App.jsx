@@ -74,7 +74,7 @@ export default function App() {
       <div className="max-w-6xl mx-auto mb-6 sm:mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-800">Task Dashboard</h1>
-          <p className="text-gray-400 text-xs sm:text-sm mt-1">ระบบจัดการงาน (ไม่ต้องเข้าสู่ระบบ)</p>
+          <p className="text-gray-400 text-xs sm:text-sm mt-1">ระบบจัดการงาน </p>
         </div>
         
         <div className="flex gap-2 sm:gap-3 w-full md:w-auto mt-2 md:mt-0">
